@@ -68,9 +68,9 @@ DeathRecords$ResidentStatus <- as.factor(DeathRecords$ResidentStatus)
 levels(DeathRecords$ResidentStatus) <- c("Residents","Intrastate Residents","Interstate Residents",
                                          "Foreign Residents")
 DeathRecords$Education2003Revision <- as.factor(DeathRecords$Education2003Revision)
-levels(DeathRecords$Education2003Revision) <- c("8th Grade or less","9-12 Grade, no diploma","HS Grad or GED",
+levels(DeathRecords$Education2003Revision) <- c("<=8th Grade","9-12 Grade","HS Grad/GED",
                                                 "Some College","Associate Degree","Bachelor Degree","Master Degree",
-                                                "Doctorate/Professional Degree","Unknown")
+                                                "Doctorate Degree","Unknown")
 DeathRecords$MonthOfDeath <- as.factor(DeathRecords$MonthOfDeath)
 levels(DeathRecords$MonthOfDeath) <- c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
 DeathRecords$PlaceOfDeathAndDecedentsStatus <- as.factor(DeathRecords$PlaceOfDeathAndDecedentsStatus)
@@ -92,8 +92,8 @@ levels(DeathRecords$CauseRecode39) <- c("TB","Syph","HIV","MNStomach","MNColon",
                                        "LD","Neph","Pregna","Perinatal","Congenital","Abnormal","Other",
                                        "Vehicle","Accident","Suicide","Homicide","OEC")
 DeathRecords$Race <- as.factor(DeathRecords$Race)
-levels(DeathRecords$Race) <- c("Other","White","Black","American Indian","Chinese","Japanese","Hawaiian","Filipino","Other Asian",
-                               "Asian Indian","Korean","Samoan","Vietnamese","Guamanian","Other Asian*","Combined Asian")
+levels(DeathRecords$Race) <- c("Other","White","Black","US Indian","Chinese","Japanese","Hawaiian","Filipino","Other Asian",
+                               "Asian Indian","Korean","Samoan","Vietnamese","Guamanian","Other Asian*","All Asian")
 DeathRecords$BridgedRaceFlag <- as.factor(DeathRecords$BridgedRaceFlag)
 levels(DeathRecords$BridgedRaceFlag) <- c("Not Bridged","Is Bridged")
 DeathRecords$HispanicOriginRaceRecode <- as.factor(DeathRecords$HispanicOriginRaceRecode)
@@ -102,28 +102,49 @@ levels(DeathRecords$HispanicOriginRaceRecode) <- c("Mexican","Puerto Rican","Cub
 
 
 # Explore Trends in the Data
+# Summary Statistics & Specific subgroups related to Cause of Death
 # ==============================================================
 
 SummaryStatistics <- summary(DeathRecords)
 attach(DeathRecords)
-hist(AgeRecode27)
-hist(ResidentStatus)
-hist(Education2003Revision)
-hist(MonthOfDeath)
-barplot(table(Sex), xlab = "Sex", ylab = "Number of Deaths", main = "Deaths by Sex")
-barplot(table(CauseRecode39[Sex == "M"]))
-barplot(table(CauseRecode39))
+
+SexPlot <- barplot(table(Sex), xlab = "Sex", ylab = "Number of Deaths", main = "Deaths by Sex",
+        ylim = c(0, 1400000))
+text(x = SexPlot, y = table(Sex), label = table(Sex), pos = 3, cex = 0.8, col = "red")
+
+EduCount <- group_by(DeathRecords, Education2003Revision) %>% summarize(count = n()) %>% arrange(desc(count))
+mp <- barplot(EduCount$count, main = "Effect of Education on Death", 
+               xlim = c(0,1.2e6), las = 2, horiz = TRUE, axisnames = FALSE)
+mtext(text = EduCount$Education2003Revision, side = 2, at = mp+0.75, line =-20, padj = par(las = 2))
 
 CauseCount <- group_by(DeathRecords, CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
-barplot(CauseCount$count, names.arg = CauseCount$CauseRecode39, las = 2)
+barplot(CauseCount$count[1:10], names.arg = CauseCount$CauseRecode39[1:10], las = 2,
+        ylab = "Number of Deaths", main = "Cause of Death", cex.axis = 0.8, cex.names = 0.8)
+
+barplot(table(DeathRecords$Race), cex.names = 1, line = -0.6, main = "Death by Race", ylim = c(0,2500000))
+
 CauseCountF <- group_by(DeathRecords[DeathRecords$Sex == "F",], CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
-barplot(CauseCountF$count, names.arg = CauseCountF$CauseRecode39, las = 2)
+barplot(CauseCountF$count[1:10], names.arg = CauseCountF$CauseRecode39[1:10], las = 2,
+        main = "Top 10 Cause of Death in Females", ylim = c(0,300000))
 CauseCountM <- group_by(DeathRecords[DeathRecords$Sex == "M",], CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
-barplot(CauseCountM$count, names.arg = CauseCountM$CauseRecode39, las = 2)
-CauseCountFR <- group_by(DeathRecords[DeathRecords$ResidentStatus == "Foreign Residents",], CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
-barplot(CauseCountFR$count, names.arg = CauseCountFR$CauseRecode39, las = 2)
+barplot(CauseCountM$count[1:10], names.arg = CauseCountM$CauseRecode39[1:10], las = 2,
+        main = "Top 10 Cause of Death in Males", ylim = c(0,250000))
 
+CauseCountj <- group_by(DeathRecords[DeathRecords$MonthOfDeath == "Jan",], CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
+barplot(CauseCountj$count[1:10], names.arg = CauseCountj$CauseRecode39[1:10], las = 2,
+        main = "Top 10 Cause of Death in January", ylim = c(0,50000))
 
+CauseCountJ <- group_by(DeathRecords[DeathRecords$MonthOfDeath == "Jul",], CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
+barplot(CauseCountJ$count[1:10], names.arg = CauseCountJ$CauseRecode39[1:10], las = 2,
+        main = "Top 10 Cause of Death in July", ylim = c(0,50000))
+
+CauseCountW <- group_by(DeathRecords[DeathRecords$HispanicOriginRaceRecode == "Non-hispanic white",], CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
+barplot(CauseCountW$count[1:10], names.arg = CauseCountW$CauseRecode39[1:10], las = 2,
+        main = "Top 10 Cause of Death Caucasian")
+
+CauseCountMe <- group_by(DeathRecords[DeathRecords$HispanicOriginRaceRecode == "Mexican",], CauseRecode39) %>% summarize(count = n()) %>% arrange(desc(count))
+barplot(CauseCountMe$count[1:10], names.arg = CauseCountMe$CauseRecode39[1:10], las = 2,
+        main = "Top 10 Cause of Death Mexicans", ylim = c(0,20000))
 
 # Build a simple Decision Tree Model
 # ====================================================================
