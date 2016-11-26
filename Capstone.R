@@ -1,5 +1,5 @@
 # CKME 136 - Capstone Project for Data Analytics
-# ID   : 
+# ID   : 500786799
 # Name : Gagan Minhas
 # ==============================================================
 
@@ -10,10 +10,17 @@ library(dplyr)
 library(rpart)
 library(tree)
 library(party)
+library(RWeka)
+library(mlbench)
+library(caret)
+library(caretEnsemble) # requires package 'chron'
+library(c50)
+library(gbm)
 # Load Death Records Data 
 # ==============================================================
-File <- 'C:/Users/Gagan/Desktop/DeathRecords.csv'
-DeathRecordsOrig <- read.csv(File, header = TRUE)
+File <- 'C:/Users/CKME999/Downloads/DeathRecords.csv'
+DeathRecords <- read.csv(File, header = TRUE)
+rm(File)
 
 # Acquire Basic Information from Data
 # ==============================================================
@@ -46,11 +53,14 @@ DeathRecords$Education2003Revision[DeathRecords$Education2003Revision == 0 &
 DeathRecords$Education2003Revision[DeathRecords$Education2003Revision == 0 & 
                                      DeathRecords$Education1989Revision == 99] <- 9
 
+
+# CauseRecode358, CauseRecode113
 dropSameAttributes <- c("Education1989Revision","EducationReportingFlag","AgeType",
                         "Age","AgeSubstitutionFlag","AgeRecode52","AgeRecode12",
-                        "CauseRecode358","CauseRecode113","Icd10Code","MannerOfDeath",
-                        "RaceImputationFlag","RaceRecode3","RaceRecode5",
-                        "HispanicOrigin")
+                        "Icd10Code","MannerOfDeath","RaceImputationFlag",
+                        "RaceRecode3","RaceRecode5","HispanicOrigin")
+
+
 
 dropNonEssAttributes <- c("Id","CurrentDataYear","Autopsy","NumberOfEntityAxisConditions",
                           "NumberOfRecordAxisConditions","MethodOfDisposition")
@@ -58,6 +68,7 @@ dropNonEssAttributes <- c("Id","CurrentDataYear","Autopsy","NumberOfEntityAxisCo
 dropNonAdultAttributes <- c("InfantAgeRecode22","InfantCauseRecode10","InfantCauseRecode130")
 dropAttributes <- c(dropNonEssAttributes,dropSameAttributes,dropNonAdultAttributes)
 DeathRecords <- DeathRecords[,!(names(DeathRecords) %in% dropAttributes)]
+rm(dropAttributes,dropNonAdultAttributes,dropNonEssAttributes,dropSameAttributes)
 
 DeathRecords <- DeathRecords[DeathRecords$AgeRecode27>=10,]
 DeathRecords <- DeathRecords[DeathRecords$CauseRecode39 !=35,]
@@ -84,13 +95,6 @@ levels(DeathRecords$ActivityCode) <- c("Sports","Leisure","Working","Other Work"
 DeathRecords$PlaceOfInjury <- as.factor(DeathRecords$PlaceOfInjury)
 levels(DeathRecords$PlaceOfInjury) <- c("Home","Residential","School","Sports","Street","Trade","Construction","Farm",
                                         "Other Specified","Unspecified","Cause of Death not W00-Y34")
-DeathRecords$CauseRecode39 <- as.factor(DeathRecords$CauseRecode39)
-levels(DeathRecords$CauseRecode39) <- c("TB","Syph","HIV","MNStomach","MNColon","MNPancreas",
-                                       "MNTrachea","MNBreast","MNcervix","MNProstate","MNUrine",
-                                       "NHLymphoma","Leuk","OMN","Diabetes","Alz","HTHD","IHD",
-                                       "OHD","HTRD","CVD","Atherosc","OCS","InfPneu","CLRD","PepUlcer",
-                                       "LD","Neph","Pregna","Perinatal","Congenital","Abnormal","Other",
-                                       "Vehicle","Accident","Suicide","Homicide","OEC")
 DeathRecords$Race <- as.factor(DeathRecords$Race)
 levels(DeathRecords$Race) <- c("Other","White","Black","US Indian","Chinese","Japanese","Hawaiian","Filipino","Other Asian",
                                "Asian Indian","Korean","Samoan","Vietnamese","Guamanian","Other Asian*","All Asian")
@@ -99,6 +103,32 @@ levels(DeathRecords$BridgedRaceFlag) <- c("Not Bridged","Is Bridged")
 DeathRecords$HispanicOriginRaceRecode <- as.factor(DeathRecords$HispanicOriginRaceRecode)
 levels(DeathRecords$HispanicOriginRaceRecode) <- c("Mexican","Puerto Rican","Cuban","Central/South American","Other Hispanic",
                                                    "Non-hispanic white","Non-hispanic black","Non-hispanic other","Unknown")
+
+# CauseRecode358
+a<-sort(table(DeathRecords$CauseRecode358),decreasing=TRUE)[1:20]
+DeathRecords358<- DeathRecords[DeathRecords$CauseRecode358 %in% c(189,159,238,214,230,228,327,257,104,81,88,207,23,420),]
+DeathRecords358<-DeathRecords358[,!names(DeathRecords358) %in% c("CauseRecode113","CauseRecode39")]
+DeathRecords358$CauseRecode358 <- as.factor(DeathRecords358$CauseRecode358)
+levels(DeathRecords358$CauseRecode358) <- c("Septicemia","Colon Cancer","Pancreatic Cancer","Breast Cancer","Diabetes","Alzheimers",
+                                            "HT Heart Disease","Athero CVD","Conduction Disorders","Congestive Heart Failure","Stroke",
+                                            "Pneumonia","Renal Failure","Accidental Poisoning-drugs")
+# sample 2k of each and try decision tree
+set.seed(1)
+n <- 31700 #ideally 31700
+train358 <-     (c(sample(which(DeathRecords358$CauseRecode358 == "Septicemia"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Colon Cancer"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Pancreatic Cancer"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Breast Cancer"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Diabetes"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Alzheimers"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "HT Heart Disease"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Athero CVD"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Conduction Disorders"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Congestive Heart Failure"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Stroke"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Pneumonia"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Renal Failure"),n),
+                   sample(which(DeathRecords358$CauseRecode358 == "Accidental Poisoning-drugs"),n)))
 
 
 # Explore Trends in the Data
@@ -149,22 +179,95 @@ barplot(CauseCountMe$count[1:10], names.arg = CauseCountMe$CauseRecode39[1:10], 
 # Build a simple Decision Tree Model
 # ====================================================================
 
+n = sum(cm) # number of instances
+nc = nrow(cm) # number of classes
+diag = diag(cm) # number of correctly classified instances per class 
+rowsums = apply(cm, 1, sum) # number of instances per class
+colsums = apply(cm, 2, sum) # number of predictions per class
+p = rowsums / n # distribution of instances over the actual classes
+q = colsums / n # distribution of instances over the predicted classes
+
+
 # rpart
-set.seed(1)
-train <- sample(1:nrow(DeathRecords), 0.7 * nrow(DeathRecords))
-
-DeathRecords %>%
-  filter(ID %in% sample(unique(ID), ceiling(0.7*length(unique(ID)))))
+rpart_tree <- rpart(CauseRecode358 ~ ., data = DeathRecords358[train358,], method = "class")
+rpart_pred <- predict(rpart_tree, DeathRecords358[-train358,-c(12)], type = "class")
+rpart_results <- table(rpart_pred, DeathRecords358[-train358,]$CauseRecode)
 
 
-DeathRecordTree <- rpart(CauseRecode39 ~ PlaceOfInjury+ActivityCode+InjuryAtWork+PlaceOfDeathAndDecedentsStatus+
-                           AgeRecode27+ResidentStatus, data = DeathRecords[train,], method = "class")
-DeathRecordPred <- predict(DeathRecordTree, DeathRecords[-train,], type = "class")
-table(DeathRecordPred, DeathRecords[-train,]$CauseRecode39)
+rpart_accuracy <- sum(diag(rpart_results)) / sum(rpart_results)
+rpart_precision <- diag(rpart_results) / apply(rpart_results, 2, sum)
+rpart_recall <- diag(rpart_results) / apply(rpart_results, 1, sum)
+
+macro_rpart_precision <- mean(rpart_precision)
+macro_rpart_recall <- mean(rpart_recall)
+
+
+
 
 # tree - limits categorical variable to 32 levels
-tree.DeathRecords <- tree(CauseRecode39 ~ AgeRecode27 + ResidentStatus + Race + MaritalStatus + ActivityCode + MonthOfDeath,
-                          data = DeathRecords[train,])
+tree.DeathRecords <- tree(CauseRecode358 ~ .,data = DeathRecords358[train358,])
+tree_pred <- predict(tree.DeathRecords, DeathRecords358[-train358,-c(12)],type="class")
+tree_results <- table(tree_pred, DeathRecords358[-train358,]$CauseRecode358)
 
-# party - takes a long time
-TreeParty <- ctree(CauseRecode39 ~ ., data = DeathRecords[train,])
+tree_accuracy <- sum(diag(tree_results)) / sum(tree_results)
+tree_precision <- diag(tree_results) / apply(tree_results, 2, sum)
+tree_recall <- diag(tree_results) / apply(tree_results, 1, sum)
+
+macro_tree_precision <- mean(tree_precision)
+macro_tree_recall <- mean(tree_recall)
+
+# rweka
+fit <- J48(CauseRecode358 ~., data = DeathRecords358[train358,])
+pred <- predict(fit, DeathRecords358[-train358,-c(12)])
+result <- table(pred, DeathRecords358[-train358,]$CauseRecode358)
+
+accuracy <- sum(diag(result)) / sum(result)
+precision <- diag(result) / apply(result, 2, sum)
+recall <- diag(result) / apply(result, 1, sum)
+
+macro_precision <- mean(precision)
+macro_recall <- mean(recall)
+
+
+# Ensemble Methods
+# 1. Boosting - C5.0 & Stochastic Gradient Boosting
+# 2. Bagging - Random Forest
+# ===============================================================
+
+controlparam <- trainControl(method="repeatedcv", number=10, repeats=3)
+seed <- 7
+metric <- "Accuracy"
+
+# C5.0
+set.seed(seed)
+fit.c50 <- train(CauseRecode358~., data = DeathRecords358[train358,], method="C5.0", 
+                 metric=metric, trControl=controlparam)
+predc50 <- predict(fit.c50, DeathRecords358[-train358,-c(12)])
+resultc50 <- table(predc50, DeathRecords358[-train358,]$CauseRecode358)
+
+accuracyc50 <- sum(diag(resultc50)) / sum(resultc50)
+precisionc50 <- diag(resultc50) / apply(resultc50, 2, sum)
+recallc50 <- diag(resultc50) / apply(resultc50, 1, sum)
+
+macro_precision <- mean(precisionc50)
+macro_recall <- mean(recallc50)
+
+# Stochastic Gradient Boosting
+set.seed(seed)
+fit.gbm <- train(CauseRecode358~., data = DeathRecords358[train358,], method="gbm", 
+                 metric=metric, trControl=controlparam, verbose=FALSE)
+
+predgbm <- predict(fit.gbm, DeathRecords358[-train358,-c(12)])
+resultgbm <- table(predgbm, DeathRecords358[-train358,]$CauseRecode358)
+
+accuracygbm <- sum(diag(resultgbm)) / sum(resultgbm)
+precisiongbm <- diag(resultgbm) / apply(resultgbm, 2, sum)
+recallgbm <- diag(resultgbm) / apply(resultgbm, 1, sum)
+
+macro_precision <- mean(precisiongbm)
+macro_recall <- mean(recallgbm)
+
+# summarize results
+boosting_results <- resamples(list(c5.0=fit.c50, gbm=fit.gbm))
+summary(boosting_results)
+dotplot(boosting_results)
